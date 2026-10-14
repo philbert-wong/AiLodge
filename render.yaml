@@ -1,0 +1,36 @@
+# Render Blueprint: one web service + one free Postgres database.
+# In Render: New > Blueprint > pick this repo. You'll be asked for the
+# values marked `sync: false`. Never put real secrets in this file.
+
+services:
+  - type: web
+    name: leash
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    # Exactly one worker: budgets, hash chains and rate limits live in one process.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /healthz
+    envVars:
+      - key: SIGNING_SECRET
+        generateValue: true        # random 256-bit master secret
+      - key: KEY_ENCRYPTION_KEY
+        generateValue: true        # master key that encrypts stored provider keys
+      - key: ADMIN_PASSWORD
+        sync: false                # you choose it; used to open the dashboard
+      - key: OPENAI_API_KEY
+        sync: false                # your OpenAI key; leave blank to run fake-only
+      - key: OPENAI_MODEL
+        sync: false                # e.g. a small, cheap model your key can use
+      - key: GLOBAL_REAL_BUDGET_USD
+        value: "1.00"              # hard ceiling on real OpenAI spend
+      - key: DATABASE_URL
+        fromDatabase:
+          name: leash-db
+          property: connectionString
+
+databases:
+  - name: leash-db
+    plan: free
+    region: singapore

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Leash Workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/workspace.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='10' cy='16' r='6' fill='none' stroke='%232b4c7e' stroke-width='3'/%3E%3Ccircle cx='22' cy='16' r='6' fill='none' stroke='%232f7d5b' stroke-width='3'/%3E%3C/svg%3E">
+</head>
+<body class="ws">
+
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">
+        <a href="/" class="wordmark home-link">Leash</a>
+        <p class="tagline">Workspace for <strong id="ws-team">your team</strong> <span class="ws-email" id="ws-email"></span></p>
+      </div>
+      <div class="top-actions">
+        <button class="kill" id="kill-btn" aria-pressed="false">
+          <span class="kill-dot" aria-hidden="true"></span>
+          <span id="kill-label">Stop every agent</span>
+        </button>
+        <button class="btn btn-quiet" id="logout">Log out</button>
+      </div>
+    </div>
+    <dl class="stats" id="stats">
+      <div><dt>Live agents</dt><dd id="s-active">0</dd></div>
+      <div><dt>Calls allowed</dt><dd id="s-allowed">0</dd></div>
+      <div><dt>Calls blocked</dt><dd id="s-blocked">0</dd></div>
+      <div><dt>Spent through Leash</dt><dd id="s-spent">$0.00</dd></div>
+      <div><dt>Alerts</dt><dd id="s-alerts">0</dd></div>
+    </dl>
+  </header>
+
+  <main class="wrap ws-wrap">
+    <p class="ws-banner" id="ws-banner" role="status" hidden></p>
+
+    <section class="setup" id="setup" aria-labelledby="setup-title">
+      <div class="setup-head">
+        <h2 id="setup-title">Get set up</h2>
+        <span class="setup-progress" id="setup-progress">0 of 3 done</span>
+      </div>
+      <ol class="setup-steps">
+        <li id="setup-key">
+          <span class="setup-check" aria-hidden="true"></span>
+          <div><strong>Save your AI key</strong><span>Encrypted before it's saved. Your agents never see it.</span></div>
+          <a href="#keys-title" class="btn">Add a key</a>
+        </li>
+        <li id="setup-agent">
+          <span class="setup-check" aria-hidden="true"></span>
+          <div><strong>Give an agent a pass</strong><span>A money limit, a call limit and an end date.</span></div>
+          <a href="#agents-title" class="btn">Create a pass</a>
+        </li>
+        <li id="setup-alerts">
+          <span class="setup-check" aria-hidden="true"></span>
+          <div><strong>Get alerts in Slack or Discord</strong><span>Know the moment something goes wrong.</span></div>
+          <a href="#alerts-title" class="btn">Set up alerts</a>
+        </li>
+      </ol>
+    </section>
+
+    <div class="ws-grid">
+      <section class="panel" aria-labelledby="keys-title">
+        <h2 id="keys-title">Your AI keys</h2>
+        <p class="panel-lede">The API key from your AI provider (OpenAI, or any service that works like it). Leash encrypts it and only unlocks it for the moment of each approved call.</p>
+        <form id="key-form" class="form-grid" autocomplete="off">
+          <label>Name
+            <input name="name" maxlength="64" placeholder="Support bot key" required>
+          </label>
+          <label>Model
+            <input name="model" maxlength="100" placeholder="gpt-4o-mini" required>
+          </label>
+          <label class="span-2">Provider address
+            <input name="base_url" maxlength="200" value="https://api.openai.com/v1" list="providers" required>
+          </label>
+          <datalist id="providers">
+            <option value="https://api.openai.com/v1">OpenAI</option>
+            <option value="https://openrouter.ai/api/v1">OpenRouter</option>
+            <option value="https://api.groq.com/openai/v1">Groq</option>
+            <option value="https://api.apiyi.com/v1">APIYI</option>
+          </datalist>
+          <label class="span-2">API key
+            <input name="api_key" type="password" maxlength="300" placeholder="sk-…" required autocomplete="new-password">
+          </label>
+          <div class="span-2 form-actions">
+            <button class="btn btn-primary" type="submit">Save encrypted</button>
+            <p class="form-msg" id="key-msg" role="status"></p>
+          </div>
+        </form>
+        <ul class="keys" id="keys"><li class="empty">No keys saved yet.</li></ul>
+      </section>
+
+      <section class="panel" aria-labelledby="alerts-title">
+        <h2 id="alerts-title">Alerts</h2>
+        <p class="panel-lede">Leash messages your channel when an agent uses a trap key, tries to leak a key, or hits its limit, and when you stop every agent.</p>
+        <form id="hook-form" class="hook-form" autocomplete="off">
+          <label>Slack or Discord webhook address
+            <input name="url" type="url" maxlength="500" placeholder="https://hooks.slack.com/services/…">
+          </label>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit" id="hook-save">Save</button>
+            <button class="btn" type="button" id="hook-test" hidden>Send a test</button>
+            <button class="btn btn-quiet" type="button" id="hook-remove" hidden>Turn off</button>
+          </div>
+          <p class="form-msg" id="hook-msg" role="status"></p>
+        </form>
+        <details class="help">
+          <summary>Where do I find a webhook address?</summary>
+          <p><strong>Slack:</strong> create an app at api.slack.com/apps, turn on Incoming Webhooks, add one for your channel and copy its address.</p>
+          <p><strong>Discord:</strong> open the channel's settings, choose Integrations, then Webhooks, create one and copy its address.</p>
+        </details>
+        <h3 class="sub">Recent alerts</h3>
+        <ul class="alerts" id="alerts"><li class="empty">Nothing suspicious yet.</li></ul>
+      </section>
+    </div>
+
+    <section class="panel" aria-labelledby="agents-title">
+      <h2 id="agents-title">Agents</h2>
+      <p class="panel-lede">Give each agent its own pass instead of your key. It works like a prepaid card: it can't spend more than its limit, it ends on its own, and you can stop it any time.</p>
+      <form id="agent-form" class="form-grid agent-form" autocomplete="off">
+        <label>Agent name
+          <input name="agent" maxlength="64" placeholder="support-assistant" required>
+        </label>
+        <label>Uses
+          <select name="upstream"></select>
+        </label>
+        <label>Money limit (USD)
+          <input name="budget_usd" type="number" min="0.001" max="500" step="0.001" value="5" required>
+        </label>
+        <label>Call limit
+          <input name="max_calls" type="number" min="1" max="100000" step="1" value="500" required>
+        </label>
+        <label>Ends after
+          <select name="ttl_minutes">
+            <option value="60">1 hour</option>
+            <option value="1440">1 day</option>
+            <option value="10080" selected>7 days</option>
+            <option value="43200">30 days</option>
+          </select>
+        </label>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Create pass</button>
+        </div>
+        <p class="form-msg span-all" id="agent-msg" role="status"></p>
+      </form>
+
+      <div class="pass" id="pass" hidden>
+        <div class="pass-head">
+          <h3>Pass for <span id="pass-agent"></span></h3>
+          <button class="btn btn-quiet" id="pass-close" type="button">Done</button>
+        </div>
+        <p>Copy it now. Leash keeps no readable copy, so it can't be shown again.</p>
+        <div class="pass-row">
+          <code id="pass-token"></code>
+          <button class="btn" id="pass-copy" type="button">Copy</button>
+        </div>
+        <p>Then change two lines in your agent:</p>
+        <pre class="code" id="pass-code"></pre>
+        <div class="pass-try">
+          <button class="btn" id="pass-try" type="button">Try it: send a test message</button>
+          <p class="outcome" id="pass-try-out" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="tokens agents">
+          <thead><tr><th>Agent</th><th>Uses</th><th>Status</th><th>Calls</th><th>Spent</th><th>Ends</th><th><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody id="agents-body"><tr><td colspan="7" class="empty">No agents yet. Create a pass above.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel run" id="agent-run" aria-labelledby="run-title"></section>
+
+    <div class="ws-grid">
+      <section class="panel chain-section" aria-labelledby="log-title">
+        <div class="section-head">
+          <div>
+            <h2 id="log-title">Activity log</h2>
+            <p>Every entry is linked to the one before it, so any later edit is caught.</p>
+          </div>
+          <button class="btn" id="verify-btn" type="button">Check the log</button>
+        </div>
+        <p class="outcome" id="verify-out" aria-live="polite"></p>
+        <div class="chain-scroll"><ol class="chain" id="chain"></ol></div>
+      </section>
+
+      <section class="panel" aria-labelledby="traps-title">
+        <h2 id="traps-title">Trap keys</h2>
+        <p class="panel-lede">Fake keys that only a hijacked agent would ever use. Leave them where an attacker would look. If anything uses one, Leash blocks it and alerts you.</p>
+        <ul class="traps" id="traps"></ul>
+      </section>
+    </div>
+  </main>
+
+  <script src="/static/agentrun.js"></script>
+  <script src="/static/workspace.js"></script>
+</body>
+</html>

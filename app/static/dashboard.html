@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Leash Demo</title>
+  <meta name="description" content="Short-lived, limited, revocable keys for AI agents, with a log nobody can quietly rewrite.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='10' cy='16' r='6' fill='none' stroke='%232b4c7e' stroke-width='3'/%3E%3Ccircle cx='22' cy='16' r='6' fill='none' stroke='%232f7d5b' stroke-width='3'/%3E%3C/svg%3E">
+</head>
+<body data-mode="operator">
+
+  <!-- Sign-in (control room only) -->
+  <div class="gate operator-only" id="gate">
+    <form class="gate-box" id="gate-form">
+      <h1 class="wordmark">Leash</h1>
+      <p>Enter the operator password to open the control room.</p>
+      <label for="gate-pw">Operator password</label>
+      <input id="gate-pw" type="password" autocomplete="current-password" required>
+      <p class="gate-error" id="gate-error" role="alert"></p>
+      <button type="submit" class="btn btn-primary">Open control room</button>
+    </form>
+  </div>
+
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">
+        <h1 class="wordmark"><a href="/" class="home-link">Leash</a></h1>
+        <p class="tagline operator-only">Control room. Budgets your AI agents can't overspend, and a record they can't fake.</p>
+        <p class="tagline sandbox-only">Live demo. Your own private copy of Leash with a little real AI to spend, deleted after 3 hours.</p>
+      </div>
+      <div class="top-actions">
+        <a class="btn btn-quiet sandbox-only top-cta" href="/signup">Use Leash for your team</a>
+        <span class="upstream-badge" id="upstream-badge">Fake AI only</span>
+        <button class="kill" id="kill-btn" aria-pressed="false">
+          <span class="kill-dot" aria-hidden="true"></span>
+          <span id="kill-label">Stop every agent</span>
+        </button>
+      </div>
+    </div>
+    <dl class="stats" id="stats">
+      <div><dt>Active tokens</dt><dd id="s-active">0</dd></div>
+      <div><dt>Calls allowed</dt><dd id="s-allowed">0</dd></div>
+      <div><dt>Calls blocked</dt><dd id="s-blocked">0</dd></div>
+      <div><dt>Spent through Leash</dt><dd id="s-spent">$0.00</dd></div>
+      <div><dt>Alerts</dt><dd id="s-alerts">0</dd></div>
+    </dl>
+  </header>
+
+  <main class="wrap tabs" data-tabs>
+    <div class="tab-list" role="tablist" aria-label="Demo sections">
+      <button role="tab" data-tab="agent" data-label="Real agent"><span class="tab-n">1</span>Real agent</button>
+      <button role="tab" data-tab="maya" data-label="Maya's weekend"><span class="tab-n">2</span>Maya's weekend</button>
+      <button role="tab" data-tab="protections" data-label="Each protection"><span class="tab-n">3</span>Each protection</button>
+      <button role="tab" data-tab="key" data-label="Your key"><span class="tab-n">4</span>Your key</button>
+      <button role="tab" data-tab="log" data-label="Log and tools"><span class="tab-n">5</span>Log and tools</button>
+    </div>
+
+    <div class="tab-panel" data-panel="agent">
+    <section class="run" id="agent-run" aria-labelledby="run-title"></section>
+    <div data-tab-step></div>
+    </div>
+
+    <div class="tab-panel" data-panel="maya" hidden>
+    <section class="story" aria-labelledby="story-title">
+      <div class="story-head">
+        <div>
+          <p class="run-eyebrow">Demo 2 · Attacks</p>
+          <h2 id="story-title">Maya's support inbox</h2>
+          <p class="story-sub">Maya runs a small online shop. This weekend an AI assistant answers her customer emails while she's away. It works with a Leash pass, never her real API key.</p>
+        </div>
+        <div class="story-controls">
+          <label class="operator-only">AI <select id="st-ai"></select></label>
+          <button class="btn btn-primary" id="st-next">Start Maya's weekend</button>
+          <button class="btn btn-quiet" id="st-restart" hidden>Start over</button>
+        </div>
+      </div>
+
+      <div class="story-grid">
+        <div class="st-col">
+          <h3>The support assistant</h3>
+          <ol class="st-feed" id="st-feed" aria-live="polite">
+            <li class="st-empty">It's Friday morning. Maya hands her support inbox to an AI assistant and logs off for the weekend. One email is a trap. Press <strong>Start Maya's weekend</strong> and watch what Leash does at every step.</li>
+          </ol>
+        </div>
+
+        <div class="st-col">
+          <h3>Leash checks every action</h3>
+          <ol class="gates" id="gates">
+            <li data-gate="0"><span class="gate-dot" aria-hidden="true"></span>Not a trap key</li>
+            <li data-gate="1"><span class="gate-dot" aria-hidden="true"></span>Not a real key</li>
+            <li data-gate="2"><span class="gate-dot" aria-hidden="true"></span>Valid pass</li>
+            <li data-gate="3"><span class="gate-dot" aria-hidden="true"></span>Not stopped</li>
+            <li data-gate="4"><span class="gate-dot" aria-hidden="true"></span>No leaked secrets</li>
+            <li data-gate="5"><span class="gate-dot" aria-hidden="true"></span>Within limits</li>
+            <li data-gate="6"><span class="gate-dot" aria-hidden="true"></span>Sent and logged</li>
+          </ol>
+          <div class="gate-ai" id="gate-ai"><span class="gate-dot" aria-hidden="true"></span><span id="gate-ai-name">AI model</span></div>
+          <p class="gate-verdict" id="gate-verdict" aria-live="polite">Waiting for the assistant's first action.</p>
+        </div>
+
+        <div class="st-col safe">
+          <h3>The safe</h3>
+          <div class="safe-box">
+            <span class="lock" aria-hidden="true"></span>
+            <div>
+              <strong>Maya's real API key</strong>
+              <p id="safe-key">Locked away. The assistant never gets it.</p>
+            </div>
+          </div>
+          <div class="safe-pass">
+            <strong>The assistant's pass</strong>
+            <code id="safe-pass">No pass yet</code>
+            <span class="safe-exp" id="safe-exp"></span>
+            <div class="bar-row"><span>Calls</span><div class="bar"><i id="safe-calls-bar"></i></div><span id="safe-calls">–</span></div>
+            <div class="bar-row"><span>Money</span><div class="bar"><i id="safe-money-bar"></i></div><span id="safe-money">–</span></div>
+          </div>
+          <button class="stop-agent" id="st-stop" disabled>Stop the assistant</button>
+          <ul class="safe-alerts" id="safe-alerts"></ul>
+        </div>
+      </div>
+    </section>
+
+    <div data-tab-step></div>
+    </div>
+
+    <div class="tab-panel" data-panel="protections" hidden>
+    <div class="panel-intro">
+      <h2>Each protection on its own</h2>
+      <p>The same checks as the demos, one at a time.</p>
+    </div>
+    <section class="demo">
+      <ol class="steps">
+
+        <li class="step" id="step-1">
+          <div class="step-head">
+            <span class="step-num">1</span>
+            <div>
+              <h3>An agent with a raw key</h3>
+            </div>
+          </div>
+          <div class="meter-pair">
+            <div class="meter"><span class="meter-num" id="r-calls">0</span><span class="meter-label">calls</span></div>
+            <div class="meter"><span class="meter-num" id="r-cost">$0.00</span><span class="meter-label">estimated cost</span></div>
+          </div>
+          <p class="outcome" id="r-outcome"></p>
+          <div class="step-actions">
+            <button class="btn btn-primary" id="r-start">Run unprotected agent</button>
+            <button class="btn" id="r-stop" disabled>Stop</button>
+          </div>
+        </li>
+
+        <li class="step" id="step-2">
+          <div class="step-head">
+            <span class="step-num">2</span>
+            <div>
+              <h3>The same agent on a leash</h3>
+            </div>
+          </div>
+          <div class="bars">
+            <div class="bar-row"><span>Calls</span><div class="bar"><i id="l-calls-bar"></i></div><span id="l-calls">0 / 40</span></div>
+            <div class="bar-row"><span>Budget</span><div class="bar"><i id="l-budget-bar"></i></div><span id="l-budget">$0.00 / $1.00</span></div>
+          </div>
+          <p class="outcome" id="l-outcome"></p>
+          <div class="step-actions">
+            <button class="btn btn-primary" id="l-start">Run leashed agent</button>
+            <button class="btn btn-danger" id="l-revoke" disabled>Revoke this token</button>
+          </div>
+        </li>
+
+        <li class="step" id="step-3">
+          <div class="step-head">
+            <span class="step-num">3</span>
+            <div>
+              <h3>A prompt injection tries to steal a key</h3>
+            </div>
+          </div>
+          <blockquote class="poison" id="poison">Loading the poisoned page…</blockquote>
+          <ul class="log-lines" id="i-lines"></ul>
+          <div class="step-actions">
+            <button class="btn btn-primary" id="i-start">Let the agent read the page</button>
+          </div>
+        </li>
+
+        <li class="step" id="step-4">
+          <div class="step-head">
+            <span class="step-num">4</span>
+            <div>
+              <h3>Someone rewrites history</h3>
+            </div>
+          </div>
+          <div class="verdict" id="verdict" data-state="idle">
+            <strong id="verdict-title">Not checked yet</strong>
+            <span id="verdict-text">Check the log to make sure nothing has been changed.</span>
+          </div>
+          <p class="outcome" id="t-outcome"></p>
+          <div class="step-actions">
+            <button class="btn btn-primary" id="t-verify">Check the log</button>
+            <button class="btn btn-danger" id="t-tamper">Change a past entry</button>
+            <button class="btn btn-quiet" id="t-reset">Reset demo</button>
+          </div>
+        </li>
+
+        <li class="step step-wide operator-only" id="step-5">
+          <div class="step-head">
+            <span class="step-num">5</span>
+            <div>
+              <h3>A real AI agent on a leash</h3>
+            </div>
+          </div>
+          <div class="ra-controls">
+            <label>AI key <select id="ra-upstream"></select></label>
+            <label>Call limit <input id="ra-calls" type="number" min="1" max="20" value="5"></label>
+          </div>
+          <ol class="ra-replies" id="ra-replies"></ol>
+          <p class="outcome" id="ra-outcome"></p>
+          <div class="step-actions">
+            <button class="btn btn-primary" id="ra-start">Run real agent</button>
+            <button class="btn btn-danger" id="ra-revoke" disabled>Revoke this token</button>
+          </div>
+        </li>
+      </ol>
+    </section>
+    <div data-tab-step></div>
+    </div>
+
+    <div class="tab-panel" data-panel="key" hidden>
+    <section class="byok" aria-labelledby="byok-title">
+      <div class="byok-intro">
+        <h2 id="byok-title">Bring your own key</h2>
+        <p>Add your own API key. Leash encrypts it before saving it and only unlocks it for the moment a call is made.</p>
+        <p class="byok-note sandbox-only">In this sandbox, keys are encrypted exactly the same way but calls still go to the free fake AI. Use a made-up key such as <code>sk-test-1234567890</code>, not a real one.</p>
+        <form class="issue" id="key-form" autocomplete="off">
+          <div class="issue-row two">
+            <label>Name <input name="name" value="Team key" maxlength="64" required></label>
+            <label>Model <input name="model" value="gpt-4o-mini" maxlength="100" required></label>
+          </div>
+          <label>Provider base URL <input name="base_url" value="https://api.openai.com/v1" maxlength="200" required></label>
+          <label>API key <input name="api_key" type="password" minlength="8" maxlength="300" required autocomplete="off" spellcheck="false"></label>
+          <p class="form-error" id="key-error" role="alert"></p>
+          <button class="btn btn-primary" type="submit">Encrypt and store key</button>
+        </form>
+      </div>
+      <div class="byok-list">
+        <h3>Stored keys</h3>
+        <ul class="keys" id="keys"><li class="empty">No keys stored yet.</li></ul>
+        <p class="key-note" id="key-note" role="status"></p>
+      </div>
+    </section>
+    <div data-tab-step></div>
+    </div>
+
+    <div class="tab-panel" data-panel="log" hidden>
+    <div class="lower">
+      <section class="chain-section" aria-labelledby="chain-title">
+        <div class="section-head">
+          <h2 id="chain-title">Activity log</h2>
+        </div>
+        <div class="chain-scroll" tabindex="0" aria-label="Audit chain entries">
+          <ol class="chain" id="chain"></ol>
+        </div>
+      </section>
+
+      <aside class="side">
+        <section aria-labelledby="tokens-title">
+          <h2 id="tokens-title">Tokens</h2>
+          <div class="table-wrap">
+            <table class="tokens">
+              <thead><tr><th>Agent</th><th>Status</th><th>Calls</th><th>Spent</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody id="tokens-body"><tr><td colspan="5" class="empty">No tokens yet. Run step 2 or issue one below.</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section aria-labelledby="alerts-title">
+          <h2 id="alerts-title">Alerts</h2>
+          <ul class="alerts" id="alerts"><li class="empty">Nothing suspicious yet.</li></ul>
+          <form class="hook-mini operator-only" id="hook-form" autocomplete="off">
+            <label>Also send alerts to Slack or Discord
+              <input name="url" type="url" maxlength="500" placeholder="https://hooks.slack.com/services/…">
+            </label>
+            <div class="hook-mini-actions">
+              <button class="btn" type="submit" id="hook-save">Save</button>
+              <button class="btn" type="button" id="hook-test" hidden>Send a test</button>
+              <button class="btn btn-quiet" type="button" id="hook-remove" hidden>Turn off</button>
+            </div>
+            <p class="hook-mini-msg" id="hook-msg" role="status"></p>
+          </form>
+        </section>
+
+        <section aria-labelledby="issue-title">
+          <h2 id="issue-title">Issue a token for your own agent</h2>
+          <form class="issue" id="issue-form">
+            <label>Agent name <input name="agent" value="my-agent" maxlength="64" required></label>
+            <label>AI
+              <select name="upstream" id="issue-upstream">
+                <option value="fake">Free fake AI</option>
+                <option value="openai">Server key (real AI)</option>
+              </select>
+            </label>
+            <div class="issue-row">
+              <label>Minutes <input name="ttl_minutes" type="number" min="1" max="60" value="15"></label>
+              <label>Calls <input name="max_calls" type="number" min="1" max="1000" value="20"></label>
+              <label>Budget $ <input name="budget_usd" type="number" min="0.01" max="5" step="0.01" value="0.50"></label>
+            </div>
+            <button class="btn btn-primary" type="submit">Issue token</button>
+          </form>
+          <div class="issued" id="issued" hidden>
+            <p>Copy it now. Leash stores only the token's id, never the token.</p>
+            <code class="token-text" id="issued-token"></code>
+            <button class="btn btn-quiet" id="copy-token" type="button">Copy token</button>
+            <pre class="snippet" id="issued-snippet"></pre>
+          </div>
+        </section>
+
+        <section aria-labelledby="real-title" id="real-section" class="operator-only" hidden>
+          <h2 id="real-title">One real OpenAI call</h2>
+          <p class="muted">Issues a 3-call, $0.02 token and sends one short prompt through Leash to <span id="real-model"></span>.</p>
+          <button class="btn btn-primary" id="real-btn">Make a real call</button>
+          <p class="outcome" id="real-out"></p>
+        </section>
+
+        <section aria-labelledby="canary-title">
+          <h2 id="canary-title">Planted trap keys</h2>
+          <ul class="canaries" id="canaries"></ul>
+        </section>
+      </aside>
+    </div>
+    <div data-tab-step></div>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <p>Leash keeps your real key on the server, gives agents limited tokens, and records everything in a log that can't be secretly changed.</p>
+    <div class="foot-links">
+      <a href="/">About Leash</a>
+      <button class="btn btn-quiet operator-only" id="logout">Sign out</button>
+    </div>
+  </footer>
+
+  <script src="/static/tabs.js"></script>
+  <script src="/static/agentrun.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

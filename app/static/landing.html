@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Leash</title>
+  <meta name="description" content="Leash gives every AI agent a budget it can't overspend and a record it can't fake. Your API key stays encrypted where the agent can't reach it.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/landing.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='10' cy='16' r='6' fill='none' stroke='%232b4c7e' stroke-width='3'/%3E%3Ccircle cx='22' cy='16' r='6' fill='none' stroke='%232f7d5b' stroke-width='3'/%3E%3C/svg%3E">
+</head>
+<body class="landing">
+
+  <nav class="nav">
+    <a href="/" class="wordmark home-link">Leash</a>
+    <div class="nav-links">
+      <a href="#why-leash">Why Leash</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#plans">Plans</a>
+      <a href="/login" class="nav-keep">Log in</a>
+      <a href="/signup" class="btn btn-primary">Start free</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="hero-copy">
+      <h1>A budget your AI agent can't overspend. A record it can't fake.</h1>
+      <p class="lede">Leash gives every AI agent a signed pass with a hard money limit, keeps your API key encrypted where the agent can't reach it, and seals every call into a record nobody can quietly rewrite.</p>
+      <div class="hero-actions">
+        <a href="/try" class="btn btn-primary btn-big">Watch a real agent hit its limit</a>
+        <a href="/signup" class="btn btn-big">Start free</a>
+      </div>
+      <p class="hero-note">The demo uses a real AI and real money, in fractions of a cent, paid by us. No sign-up needed.</p>
+    </div>
+
+    <figure class="flow" aria-label="How a request travels through Leash">
+      <div class="node node-agent">
+        <span class="node-title">Your agent</span>
+        <span class="node-sub">holds only a Leash pass</span>
+        <code>lsh_eyJhZ2VudCI6…</code>
+      </div>
+      <div class="arrow" aria-hidden="true"></div>
+      <div class="node node-leash">
+        <span class="node-title">Leash</span>
+        <span class="node-sub">your real key stays here</span>
+        <ul class="checks">
+          <li>Genuine pass, not expired</li>
+          <li>Within its money and call limits</li>
+          <li>Not stopped</li>
+          <li>No trap keys, no leaked secrets</li>
+          <li>Written to the record</li>
+        </ul>
+      </div>
+      <div class="arrow" aria-hidden="true"></div>
+      <div class="node node-provider">
+        <span class="node-title">Your AI provider</span>
+        <span class="node-sub">sees only approved calls</span>
+      </div>
+    </figure>
+  </header>
+
+  <main class="tabs" data-tabs>
+    <div class="tab-list landing-tabs" role="tablist" aria-label="About Leash">
+      <button role="tab" data-tab="why-leash" data-label="Why Leash"><span class="tab-n">1</span>Why Leash</button>
+      <button role="tab" data-tab="how-it-works" data-label="How it works"><span class="tab-n">2</span>How it works</button>
+      <button role="tab" data-tab="checks" data-label="The 7 checks"><span class="tab-n">3</span>The 7 checks</button>
+      <button role="tab" data-tab="security" data-label="Security"><span class="tab-n">4</span>Security</button>
+      <button role="tab" data-tab="attacks" data-label="Attacks"><span class="tab-n">5</span>Attacks</button>
+      <button role="tab" data-tab="who" data-label="Who it's for"><span class="tab-n">6</span>Who it's for</button>
+    </div>
+
+    <div class="tab-panel" data-panel="why-leash">
+    <section class="band origin" id="why" aria-labelledby="why-title">
+      <div class="band-inner">
+        <p class="origin-label">Why we built Leash</p>
+        <h2 id="why-title">$100 budget. $5,000 bill. Logs that said everything was fine.</h2>
+        <p class="origin-story">A developer left an AI agent to finish a task with a $100 budget. When he came back, it had spent about $5,000, doing far more than he asked. When he checked its logs, they said nothing had gone wrong.</p>
+        <ol class="fixes">
+          <li>
+            <span class="fix-problem">The budget was a request, not a limit.</span>
+            <strong>Leash enforces it.</strong>
+            <p>The agent gets a pass signed with HMAC-SHA256 that carries its budget. Before each call, Leash works out the most that call could cost and refuses it if it could go over. The agent can't spend past its limit, and it can't edit the pass to raise it.</p>
+          </li>
+          <li>
+            <span class="fix-problem">The agent held the real API key.</span>
+            <strong>Leash keeps it out of reach.</strong>
+            <p>Your key is encrypted with AES-256-GCM and only unlocked inside Leash for the moment of each approved call. The agent only ever sees its pass.</p>
+          </li>
+          <li>
+            <span class="fix-problem">The agent wrote its own logs.</span>
+            <strong>Leash writes the record.</strong>
+            <p>Every call is recorded by Leash, not the agent, and each entry is sealed to the one before it with HMAC-SHA256. Change one entry and Leash points to exactly which one.</p>
+          </li>
+        </ol>
+        <div class="origin-cta">
+          <a href="/try" class="btn btn-primary">See it with a real agent and real money</a>
+          <span>Give it a task and a budget of a tenth of a cent. It's told to keep improving its work, so it overdoes it. Watch Leash stop it at the limit, then try to fake the record.</span>
+        </div>
+      </div>
+    </section>
+      <div class="band-inner tab-step-wrap"><div data-tab-step></div></div>
+    </div>
+
+    <div class="tab-panel" data-panel="how-it-works" hidden>
+    <section class="band" aria-labelledby="idea-title">
+      <div class="band-inner split">
+        <div>
+          <h2 id="idea-title">The idea: a prepaid card for AI agents</h2>
+          <p>You wouldn't hand a new hire the company credit card with no limit. You'd give them a prepaid card: a set amount, an end date, and you can cancel it in a second.</p>
+          <p>Today's AI agents get the equivalent of the company card: a raw API key that never expires, has no budget and can be stolen. Leash gives them the prepaid card instead.</p>
+        </div>
+        <dl class="compare">
+          <div><dt>Raw API key</dt><dd>Never expires</dd><dd>No spending limit</dd><dd>Revoking it breaks everything else</dd><dd>Logs anyone can edit</dd></div>
+          <div class="compare-leash"><dt>Leash pass</dt><dd>Ends on its own</dd><dd>Hard money and call limits</dd><dd>Stop one agent, or all, instantly</dd><dd>A record that proves itself</dd></div>
+        </dl>
+      </div>
+    </section>
+    <section class="band band-quiet" id="how" aria-labelledby="how-title">
+      <div class="band-inner">
+        <h2 id="how-title">Set up in three steps</h2>
+        <ol class="three">
+          <li>
+            <strong>Save your AI key</strong>
+            <p>Paste the key from OpenAI or any compatible provider. Leash encrypts it before saving. Your agents never see it.</p>
+          </li>
+          <li>
+            <strong>Give each agent a pass</strong>
+            <p>Name the agent, set a money limit, a call limit and when it ends. Stop it any time, from any device.</p>
+          </li>
+          <li>
+            <strong>Run a test, then connect your agent</strong>
+            <p>Run the built-in test agent to watch your limit hold. Then point your own agent at Leash with two lines of code. Add Slack or Discord to hear about trouble.</p>
+          </li>
+        </ol>
+        <pre class="code code-wide"><code>from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://your-leash/v1",   # 1. send calls through Leash
+    api_key="lsh_…",                    # 2. the agent's pass, not your key
+)</code></pre>
+      </div>
+    </section>
+      <div class="band-inner tab-step-wrap"><div data-tab-step></div></div>
+    </div>
+
+    <div class="tab-panel" data-panel="checks" hidden>
+    <section class="band" aria-labelledby="checks-title">
+      <div class="band-inner">
+        <h2 id="checks-title">Every call passes the same checks, in order</h2>
+        <p class="section-lede">Before your real key is used, each request goes through these checks. The first one that fails stops the call and goes on the record.</p>
+        <ol class="pipeline">
+          <li><strong>Is it a trap key?</strong> Fake keys are planted where only a hijacked agent would look. Using one blocks the call and raises an alert.</li>
+          <li><strong>Is it a real provider key?</strong> Refused. Agents only ever get passes.</li>
+          <li><strong>Is the pass genuine and still valid?</strong> Forged or expired passes are refused.</li>
+          <li><strong>Has it been stopped?</strong> One click stops one agent or all of them.</li>
+          <li><strong>Is a secret being leaked?</strong> Messages containing keys are blocked before they leave.</li>
+          <li><strong>Is it within its limits?</strong> Calls and money are capped, checked before the call is made.</li>
+          <li><strong>Send and record.</strong> Only now is the real key used, and the result goes on the record.</li>
+        </ol>
+      </div>
+    </section>
+      <div class="band-inner tab-step-wrap"><div data-tab-step></div></div>
+    </div>
+
+    <div class="tab-panel" data-panel="security" hidden>
+    <section class="band" aria-labelledby="byok-title">
+      <div class="band-inner split">
+        <div>
+          <h2 id="byok-title">Your key, encrypted</h2>
+          <p>Each key is locked with its own random key, which is locked again with a master key that lives on the server, never in the database. A stolen copy of the database holds nothing usable.</p>
+          <p>If anyone changes a stored key, even by one character, Leash refuses to use it and tells you. Remove a key and it's erased for good.</p>
+        </div>
+        <ol class="vault" aria-label="How a stored key is protected">
+          <li><span class="vault-label">Your API key</span><code>sk-…3456</code></li>
+          <li><span class="vault-label">Locked with its own random key</span><span class="vault-sub">AES-256, the standard banks use</span></li>
+          <li><span class="vault-label">That key is locked with a master key</span><span class="vault-sub">Kept on the server, never in the database</span></li>
+          <li class="vault-db"><span class="vault-label">The database stores</span><code>q3VzZXItZW5jcnlwdGVkLWJsb2I…</code><span class="vault-sub">Scrambled text and nothing else</span></li>
+        </ol>
+      </div>
+    </section>
+    <section class="band band-quiet" aria-labelledby="log-title">
+      <div class="band-inner split">
+        <div>
+          <h2 id="log-title">A record that proves itself</h2>
+          <p>Every entry is linked to the one before it. Change or delete any entry and Leash points to exactly where, even if the person editing it has full access to the database.</p>
+          <p>The agent never writes to it. In <a href="/try">the demo</a>, press <strong>Try to fake the record</strong> after a run: one step's cost is changed to $0.00 in the database, and Leash catches it.</p>
+        </div>
+        <ol class="mini-chain" aria-label="Example of three linked record entries, the middle one edited">
+          <li>
+            <span class="mc-event">Step 6 allowed, $0.00013</span>
+            <span class="mc-hash">checked</span>
+          </li>
+          <li class="mc-broken">
+            <span class="mc-event">Step 7 allowed, <s>$0.00013</s> $0.00</span>
+            <span class="mc-hash">changed after it was saved</span>
+          </li>
+          <li class="mc-after">
+            <span class="mc-event">Step 8 refused, budget reached</span>
+            <span class="mc-hash">can't be trusted after the change</span>
+          </li>
+        </ol>
+      </div>
+    </section>
+      <div class="band-inner tab-step-wrap"><div data-tab-step></div></div>
+    </div>
+
+    <div class="tab-panel" data-panel="attacks" hidden>
+    <section class="band band-quiet" id="story" aria-labelledby="story-title">
+      <div class="band-inner">
+        <h2 id="story-title">It stops attacks too: Maya's weekend</h2>
+        <p class="section-lede">Maya runs a small online shop that sells handmade ceramics. On Friday she lets an AI assistant answer customer emails while she's away. Here is the same weekend twice.</p>
+        <div class="weekend">
+          <div class="weekend-col without">
+            <h3>Without Leash</h3>
+            <p class="weekend-setup">The assistant holds Maya's real API key.</p>
+            <ol class="beats">
+              <li><span class="beat-time">Fri 10am</span>Answers an order question and a return. All good.</li>
+              <li class="bad"><span class="beat-time">Fri 11pm</span>A fake “IT Support” email tells it to send the key for “verification”. It does. Someone else now spends on Maya's account.</li>
+              <li class="bad"><span class="beat-time">Sat 3am</span>A customer's auto-reply bot answers every email, and the assistant answers every auto-reply. The loop runs all weekend on Maya's card.</li>
+              <li class="bad"><span class="beat-time">Mon 9am</span>Maya finds the bill. The logs can be edited, so she can't even prove what happened.</li>
+            </ol>
+          </div>
+          <div class="weekend-col with">
+            <h3>With Leash</h3>
+            <p class="weekend-setup">The assistant holds a pass: $5, 500 calls, ends Monday 9am.</p>
+            <ol class="beats">
+              <li><span class="beat-time">Fri 10am</span>Same two helpful replies. Leash records each one and its cost.</li>
+              <li class="good"><span class="beat-time">Fri 11pm</span>The “admin key” in the email is a trap Leash planted. It's refused, the reply carrying it is blocked, and Maya gets a Slack message.</li>
+              <li class="good"><span class="beat-time">Sat 3am</span>The loop hits the pass's limit and stops. A few dollars, not a few hundred. Maya can stop it from her phone too.</li>
+              <li class="good"><span class="beat-time">Mon 9am</span>The record shows exactly what happened, and if anyone edits it, Leash points to the entry they changed.</li>
+            </ol>
+          </div>
+        </div>
+        <p class="weekend-cta"><a href="/try#story-title" class="btn">Watch Maya's weekend</a> <span>Demo 2 on the demo page.</span></p>
+      </div>
+    </section>
+      <div class="band-inner tab-step-wrap"><div data-tab-step></div></div>
+    </div>
+
+    <div class="tab-panel" data-panel="who" hidden>
+    <section class="band band-quiet" aria-labelledby="who-title">
+      <div class="band-inner">
+        <h2 id="who-title">Who it's for</h2>
+        <div class="who">
+          <article>
+            <h3>Small teams with one helpful bot</h3>
+            <p>A shop like Maya's, running a support or sales assistant. A hard monthly limit, an alert when something's off, and no key to steal.</p>
+          </article>
+          <article>
+            <h3>Agencies building agents for clients</h3>
+            <p>One pass per client and per agent, each with its own budget. See exactly what each one spent, and stop any of them without touching the others.</p>
+          </article>
+          <article>
+            <h3>Hackathons, courses and workshops</h3>
+            <p>Give 200 people AI access without handing out your key. Each pass gets a few dollars and ends with the event. Leaked passes are worth almost nothing.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+    <section class="band" id="plans" aria-labelledby="plans-title">
+      <div class="band-inner">
+        <h2 id="plans-title">Plans</h2>
+        <p class="section-lede">Leash is free while it's new. Paid plans for larger teams are planned.</p>
+        <div class="plans">
+          <article class="plan plan-now">
+            <h3>Free</h3>
+            <p class="plan-status">Available now</p>
+            <ul>
+              <li>Up to 10 saved AI keys</li>
+              <li>Up to 500 live agent passes</li>
+              <li>Slack and Discord alerts</li>
+              <li>Trap keys and leak blocking</li>
+              <li>A record nobody can quietly edit</li>
+            </ul>
+            <a href="/signup" class="btn btn-primary">Start free</a>
+          </article>
+          <article class="plan">
+            <h3>Team</h3>
+            <p class="plan-status">Coming soon</p>
+            <ul>
+              <li>Everything in Free</li>
+              <li>Several people per workspace, with roles</li>
+              <li>Monthly limits per agent that renew</li>
+              <li>Longer record history and exports</li>
+            </ul>
+          </article>
+          <article class="plan">
+            <h3>Business</h3>
+            <p class="plan-status">Coming soon</p>
+            <ul>
+              <li>Everything in Team</li>
+              <li>Single sign-on</li>
+              <li>Your own master key, in your cloud</li>
+              <li>Choice of data region</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+      <div class="band-inner tab-step-wrap"><div data-tab-step></div></div>
+    </div>
+
+    <section class="cta" aria-labelledby="cta-title">
+      <h2 id="cta-title">Put your agents on a leash</h2>
+      <p>Create a free workspace in about a minute. Save your key, set a budget, and run a test agent on your own key before connecting your real one.</p>
+      <div class="hero-actions">
+        <a href="/signup" class="btn btn-primary btn-big">Start free</a>
+        <a href="/try" class="btn btn-big">Watch a real agent hit its limit</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Leash was built for the Safety by Design track.</p>
+    <div class="foot-links">
+      <!--REPO_LINK-->
+      <a href="/control">Operator sign-in</a>
+    </div>
+  </footer>
+  <script src="/static/tabs.js"></script>
+</body>
+</html>
