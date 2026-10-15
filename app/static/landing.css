@@ -264,3 +264,5 @@
   .nav-links a:not(.btn):not(.nav-keep) { display: none; }
   .hero-actions .btn { flex: 1 1 100%; text-align: center; }
 }
+
+.fine { color: var(--muted); font-size: 0.92rem; }

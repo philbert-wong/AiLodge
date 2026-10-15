@@ -113,6 +113,8 @@ body[data-auth="signup"] .login-only { display: none !important; }
 .help { font-size: 0.88rem; color: var(--muted); }
 .help summary { cursor: pointer; color: var(--leash); }
 .help p { margin-top: 6px; }
+.key-tip { font-size: 0.86rem; color: var(--muted); margin: 0; }
+#key-protection { margin-top: 12px; }
 
 /* The new pass: shown once */
 .pass {

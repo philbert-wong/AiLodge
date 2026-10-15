@@ -108,6 +108,17 @@ connections = Table(
     Column("revoked", Boolean, nullable=False, default=False),
 )
 
+# For passes that use a workspace's saved key: a copy of that key's data key,
+# wrapped so that only the pass (whose secret Leash never stores) can unlock it.
+pass_keys = Table(
+    "leash_pass_keys",
+    metadata,
+    Column("jti", String(32), primary_key=True),
+    Column("space", String(40), nullable=False, index=True),
+    Column("conn_id", String(16), nullable=False),
+    Column("wrapped_dek", Text, nullable=False),
+)
+
 # Customer accounts. Each one owns a private space named "acct_<id>".
 accounts = Table(
     "leash_accounts",

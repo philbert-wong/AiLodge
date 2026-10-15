@@ -117,7 +117,7 @@ function renderKeys(list) {
             <dl class="stored">
               <dt>Encryption</dt><dd>${esc(k.stored.algorithm)}</dd>
               <dt>Saved as</dt><dd><code>${esc(k.stored.ciphertext)}</code></dd>
-              <dt>Master key</dt><dd>${esc(k.stored.master_key_location)}</dd>
+              <dt>Locked with</dt><dd>${esc(k.stored.master_key_location)}</dd>
             </dl>
           </details>
           <div class="key-actions">
@@ -475,6 +475,7 @@ const EVENT_LABEL = {
   KEY_STORED: ["Key saved (encrypted)", ""],
   KEY_REMOVED: ["Key removed", ""],
   KEY_INTEGRITY_FAILED: ["Saved key was tampered with", "block"],
+  KEYS_UPGRADED: ["Keys locked to your password", ""],
   ALERTS_CONNECTED: ["Alerts turned on", ""],
   ALERTS_DISCONNECTED: ["Alerts turned off", ""],
 };
@@ -491,7 +492,7 @@ function describe(entry) {
     case "ACCOUNT_CREATED":
       return `Workspace for ${d.team}`;
     case "TOKEN_ISSUED":
-      return `${d.agent}: ${d.max_calls} calls, ${smallMoney(d.budget_usd)}, ends after ${duration(d.ttl_minutes)}, uses ${upstreamName(d.upstream)}`;
+      return `${d.agent}: ${d.max_calls} calls, ${smallMoney(d.budget_usd)}, ends after ${duration(d.ttl_minutes)}, uses ${upstreamName(d.upstream)}${d.key_unlock ? " (only this pass can unlock the key)" : ""}`;
     case "CALL_ALLOWED":
       return `${d.agent} spent ${smallMoney(d.cost_usd)} (total ${smallMoney(d.spent_usd)}, call ${d.calls_used}). Message “${d.prompt_preview || ""}”`;
     case "CALL_BLOCKED":
@@ -501,9 +502,11 @@ function describe(entry) {
     case "TOKEN_REVOKED":
       return `${d.agent}: ${d.reason}`;
     case "KEY_STORED":
-      return `${d.name}: key ${d.key_hint} for ${d.model}, saved encrypted`;
+      return `${d.name}: key ${d.key_hint} for ${d.model}, saved encrypted${d.master_key_id === "acct-v1" ? " and locked to your password" : ""}`;
     case "KEY_REMOVED":
       return `${d.name}: erased for good`;
+    case "KEYS_UPGRADED":
+      return `${d.keys} saved key${d.keys === 1 ? "" : "s"} now locked with your password as well as the master key`;
     case "KEY_INTEGRITY_FAILED":
       return `${d.agent}: the saved key “${d.connection}” was changed in the database, so Leash refused to use it`;
     case "ALERTS_CONNECTED":

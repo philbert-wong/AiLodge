@@ -59,6 +59,8 @@ AUDIT_KEY = derive_key("leash/audit-chain/v1")
 CANARY_KEY = derive_key("leash/canary/v1")
 FINGERPRINT_KEY = derive_key("leash/key-fingerprint/v1")
 SESSION_KEY = derive_key("leash/session/v1")
+SESSION_ENC_KEY = derive_key("leash/session-encryption/v1")   # encrypts the account key inside the session cookie
+ACCOUNT_SALT_KEY = derive_key("leash/account-salt/v1")        # per-account salt for the password-derived key
 
 # --- Master key for encrypting stored provider keys ----------------------------
 # Kept separate from SIGNING_SECRET so each can be rotated on its own. If it's

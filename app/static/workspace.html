@@ -86,12 +86,20 @@
           <label class="span-2">API key
             <input name="api_key" type="password" maxlength="300" placeholder="sk-…" required autocomplete="new-password">
           </label>
+          <p class="span-2 key-tip"><strong>Tip:</strong> make a new key just for Leash, and set a monthly spending limit on it in your provider's settings. Then even the worst case has a ceiling you chose.</p>
           <div class="span-2 form-actions">
             <button class="btn btn-primary" type="submit">Save encrypted</button>
             <p class="form-msg" id="key-msg" role="status"></p>
           </div>
         </form>
         <ul class="keys" id="keys"><li class="empty">No keys saved yet.</li></ul>
+        <details class="help" id="key-protection">
+          <summary>How is my key protected?</summary>
+          <p><strong>Locked twice.</strong> Your key is encrypted with AES-256-GCM. The lock needs two things: a key made from your password (never stored), and Leash's master key, which is kept outside the database. Someone who copies the database, or even the database and the master key, still can't open it.</p>
+          <p><strong>Each pass carries its own unlock code.</strong> When you create a pass, Leash gives it a secret that opens your key only for that pass's calls. Leash never stores the pass, so the database alone can't run calls either. Stopping a pass deletes its copy of the lock.</p>
+          <p><strong>Used for a moment, then dropped.</strong> Your key is decrypted only while an approved call is being sent, and it never appears in a page, a log or the audit trail.</p>
+          <p><strong>What it can't stop:</strong> someone who takes over the running server could see keys while they're in use. That's why a spending limit at your provider still matters, and why you can delete a key here at any time.</p>
+        </details>
       </section>
 
       <section class="panel" aria-labelledby="alerts-title">

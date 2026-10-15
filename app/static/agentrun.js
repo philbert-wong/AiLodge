@@ -56,6 +56,7 @@ window.LeashRun = (() => {
     TOKEN_EXPIRED: "Its pass ran out of time.",
     VISITOR_BUDGET: "That used up your share of the demo's real-AI budget.",
     PUBLIC_BUDGET: "The demo's shared real-AI budget is used up.",
+    PASS_CANT_UNLOCK: "Its pass can't unlock the saved key. Create a new pass.",
   };
 
   function template(mode) {

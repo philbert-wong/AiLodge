@@ -102,13 +102,29 @@ Teams can connect their own provider (any OpenAI-compatible base URL, model and 
 2. The **master key** (`KEY_ENCRYPTION_KEY`, an environment variable, never in the database) encrypts the data key, also with AES-256-GCM.
 3. The database stores only the two ciphertexts, plus a short hint (`…3456`) and an HMAC-SHA256 fingerprint to spot duplicates.
 
+### If the website is attacked
+
+Envelope encryption alone has a weak spot: someone who steals the database **and** the master key (for example from the host's settings) can decrypt every key. So keys saved in a customer workspace get two more locks, and Leash keeps neither secret:
+
+1. **Locked to the team's password.** At sign-up and login, Leash derives an *account key* from the password with scrypt (salted per account with a server-side HMAC key, so it differs from the stored password hash). The data key is wrapped with `HMAC(master key, account key)`, which needs both. The account key is never stored; it lives only in the session cookie, encrypted with AES-256-GCM and bound to the account id.
+2. **Each pass carries its own unlock code.** When a pass is created, Leash unwraps the data key with the account key, then stores a second copy wrapped with `HMAC(master key, pass secret)`. The 128-bit pass secret sits only inside the pass (`k` in its signed claims) and is never stored or shown in the readable claims. At call time the pass presents its secret, the copy is unwrapped, the key is decrypted for that one call and dropped.
+
+| What the attacker has | Can they read a workspace key? |
+| --- | --- |
+| A copy of the database | No |
+| The database and the master key | No: they also need a team's password or a live pass |
+| The database, the master key and the signing secret | No: they can forge a pass, but not its unlock code (`PASS_CANT_UNLOCK`) |
+| Control of the running server | Yes, for keys used while they're in control. Nothing can fully stop this, so use a key made just for Leash with a spending limit at the provider |
+
+Stopping a pass deletes its copy of the lock, removing a key deletes all of them, and expired passes' copies are cleaned up. Keys saved before this upgrade are re-locked automatically the next time the team logs in (`KEYS_UPGRADED` in the log), and older sessions simply ask the team to log in again. The pages also send a strict Content-Security-Policy (only Leash's own scripts may run, and pages may only talk to Leash), HSTS, and `frame-ancestors 'none'`, so injected markup can't send a key anywhere. `tests/keyprotect_test.py` plays this attacker (49 checks, passing on SQLite and Postgres): `python tests/keyprotect_test.py`.
+
 Details that matter:
 
 - **Tamper-proof:** AES-GCM is authenticated. Flip one bit of the stored ciphertext and decryption fails, so the call is refused (`KEY_INTEGRITY_FAILED`) and an alert fires. Both layers are bound to their row as associated data, so ciphertext copied into another row won't decrypt either.
 - **Decrypted just in time:** a key is decrypted only inside the request that forwards a call, then dropped. It's never returned by the API, shown in the dashboard or written to the log, and provider error messages are scrubbed of key fragments.
 - **Crypto-shredding:** removing a key erases its ciphertext and wrapped data key, so it can never be recovered and its tokens stop working immediately.
 - **Rotation-friendly:** each record notes which master key wrapped it (`kek_id`). Rotating the master key only means re-wrapping the small data keys, not touching the API keys.
-- **Safe in the sandbox:** visitors can store keys to see exactly what the database keeps, but sandbox calls always go to the fake AI.
+- **Safe in the sandbox:** visitors can store keys to see exactly what the database keeps, but sandbox calls always go to the fake AI, so the page asks for a made-up key. Sandboxes are deleted after 3 hours.
 
 ![Bring your own key](docs/screenshots/11-key-tamper-caught.png)
 
@@ -230,7 +246,7 @@ app/
   guards.py      canary keys and outbound secret scanning
   upstream.py    fake upstream, OpenAI forwarding, cost accounting
   ratelimit.py   per-IP sliding-window rate limits
-  keyvault.py    AES-256-GCM envelope encryption for stored provider keys
+  keyvault.py    AES-256-GCM envelope encryption, plus password- and pass-bound locks
   config.py      settings from environment variables, key derivation
   db.py          tables (SQLite locally, Postgres on Render)
   static/        landing page, demo dashboard, sign-up and workspace pages
@@ -244,6 +260,9 @@ render.yaml         Render Blueprint
 - **Deleting the newest entries** can't be detected from the chain alone. Fix: periodically publish the chain's head hash somewhere external (an email, a public repo, a timestamping service).
 - **Streaming** responses aren't supported yet; `stream` is forced off.
 - **Changing `SIGNING_SECRET`** invalidates every token and makes the old log fail verification from entry #1. That's by design. Use **Reset demo** to start a fresh chain.
-- **Master key in an environment variable.** Good for a hackathon; in production it would live in a key management service (AWS KMS, Google Cloud KMS, HashiCorp Vault) so the server never holds it in plain form.
+- **Master key in an environment variable.** Good for a hackathon, and no longer enough on its own to read a workspace key. In production it would live in a key management service (AWS KMS, Google Cloud KMS, HashiCorp Vault) so the server never holds it in plain form.
+- **A taken-over server** could still see keys while they're in use. Mitigations: provider-side spending limits, a key made just for Leash, alerts on unusual use, and in future an isolated signing service that holds keys apart from the web app.
+- **No password reset yet.** Because saved keys are tied to the team's password, a reset (when added) would mean adding keys again. That's the price of the database alone being useless to an attacker.
+- **The operator's own key** (`OPENAI_API_KEY`) and the control room's saved keys are locked with the master key only, because the server needs them without anyone logged in.
 - **Accounts are single-user** and sessions can't be revoked server-side before they expire (7 days). Team plans would add several people per workspace, roles and a session list.
 - **Next:** per-tool scopes (not just per-model), human approval with signed sign-off for risky actions, Ed25519 signatures so third parties can verify the log without the secret, and a one-click master-key rotation.

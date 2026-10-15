@@ -144,6 +144,7 @@ The free plan is available now. Team (several people per workspace, renewing mon
 - **The log:** each entry's seal is `HMAC-SHA256(key, previous seal + entry)`, so entries form a chain. Because the seal is keyed, someone who can edit the database can't quietly recompute the chain after changing it.
 - **Trap keys (honeytokens):** realistic-looking fake keys, unique to each workspace, planted in places like a decoy `.env` file or a suspicious email.
 - **Saved keys, envelope encryption:** each key gets a fresh 256-bit data key and is encrypted with AES-256-GCM; the data key is then encrypted with a master key held in an environment variable, never in the database. Both layers are bound to their database row, so ciphertext moved elsewhere won't decrypt. Removing a key erases it for good. Slack and Discord webhook addresses are secrets too, so they're encrypted the same way.
+- **If the site is attacked:** a stolen database plus the master key would still open keys protected only by envelope encryption, so workspace keys get two more locks. The data key is wrapped with a key that combines the master key with a scrypt key derived from the team's password, which is never stored (it travels only in the encrypted session cookie). Each agent pass then gets its own copy, wrapped with a 128-bit secret that only the pass carries. Result: the database, the master key and even the signing secret together still can't read a key or run a call. A strict Content-Security-Policy stops injected scripts from sending anything elsewhere.
 - **Accounts:** passwords are hashed with scrypt (memory-hard, with a random salt each). Sessions are signed with HMAC in an HttpOnly cookie. Every workspace request needs a custom header, which blocks cross-site request forgery, and log-in attempts are rate-limited and take the same time whether or not the email exists.
 - **Isolation:** every row in every table belongs to exactly one space: the operator, a public demo visitor, or a customer workspace. Tests check that one team can't see, stop or use another team's keys and agents.
 - **Alerts:** sent to Slack or Discord in the background, so a slow chat service never slows an agent down. Only real Slack and Discord webhook addresses are accepted, so the server can't be pointed at internal addresses.
@@ -162,7 +163,7 @@ I used Claude, Anthropic's AI assistant, to help brainstorm the idea and to writ
 - **Turning a demo into a service.** Adding accounts meant every customer's keys, agents, alerts and log had to stay separate. I also had to make sure the clean-up job that deletes old demo copies could never touch a customer's workspace.
 - **Making budgets actually hold.** If two calls check the budget at the same moment, both can pass. Leash reserves the worst-case cost under a lock before forwarding, then settles the real cost afterwards, and releases the lock during the slow AI call.
 - **A plain hash chain isn't enough.** Someone who can edit the database can change an entry and simply recompute every hash after it. Keying the chain with HMAC closes that gap.
-- **Storing keys without ever exposing them.** I wanted tampering detected, ciphertext tied to its row, keys decrypted only at the moment of use, and removal that's truly permanent. Envelope encryption with AES-GCM covered all four.
+- **Storing keys without ever exposing them.** I wanted tampering detected, ciphertext tied to its row, keys decrypted only at the moment of use, and removal that's truly permanent. Envelope encryption with AES-GCM covered all four. Then I asked what happens if someone steals the database and the master key together, and realised the answer was "everything". Tying each key to the team's password and to each pass fixed that, and writing a test that plays the attacker proved it.
 - **Deployment surprises.** Testing against a real Postgres database caught that the database library's newest version defaults to a different Postgres driver. My hackathon key also came from an AI gateway rather than OpenAI directly, so Leash had to support any OpenAI-compatible provider address.
 
 ## Accomplishments that I'm proud of
@@ -177,6 +178,7 @@ I used Claude, Anthropic's AI assistant, to help brainstorm the idea and to writ
 
 - The difference between hashing, keyed hashing (HMAC), signatures, password hashing (scrypt) and authenticated encryption (AES-GCM), and when each is the right tool.
 - How envelope encryption works, and why it makes rotating a master key cheap.
+- Threat modelling: listing exactly what an attacker holds at each stage, and being honest about the case you can't fully stop (someone controlling the live server), which is why a provider-side spending limit still matters.
 - That honeytokens are one of the cheapest and most reliable detection tools there is.
 - Most of all: a safety control for an AI agent belongs somewhere the agent can't reach. Leash doesn't ask the agent to behave. It limits what the agent can do.
 

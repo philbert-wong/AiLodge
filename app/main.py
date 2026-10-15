@@ -79,12 +79,26 @@ app = FastAPI(title="Leash", version="1.1.0", docs_url=None, redoc_url=None, ope
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "
+    "font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; "
+    "frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'"
+)
+
+
 @app.middleware("http")
 async def _security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
+    # Only our own scripts may run, and pages may only talk to this server. Even if
+    # someone slipped markup into a page, it couldn't load a script or send data elsewhere.
+    response.headers["Content-Security-Policy"] = CSP
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    if request.headers.get("x-forwarded-proto", request.url.scheme) == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 
@@ -189,11 +203,17 @@ def control_page():
 
 
 def _session_account(request: Request):
-    account_id = accounts.read_session(request.cookies.get(accounts.COOKIE, ""))
-    if not account_id:
+    """The signed-in account, or None. Also keeps the account's password-derived
+    key on the request, for unlocking the team's saved keys."""
+    session = accounts.read_session(request.cookies.get(accounts.COOKIE, ""))
+    if not session:
         return None
+    account_id, user_key = session
     with db.engine.connect() as conn:
-        return conn.execute(select(db.accounts).where(db.accounts.c.id == account_id)).first()
+        row = conn.execute(select(db.accounts).where(db.accounts.c.id == account_id)).first()
+    if row is not None:
+        request.state.user_key = user_key
+    return row
 
 
 @app.get("/signup", include_in_schema=False)
@@ -346,6 +366,7 @@ def _handle_proxy(presented: str, body, ip: str):
 
         # A token issued for a team's own stored key ("bring your own key").
         connection = None
+        pass_wrapped = None
         if upstream_name.startswith("c_"):
             c = db.connections.c
             connection = conn.execute(select(db.connections).where(c.id == upstream_name, c.space == space)).first()
@@ -353,6 +374,16 @@ def _handle_proxy(presented: str, body, ip: str):
                 return block(403, "CONNECTION_REMOVED", "The provider key this token was issued for has been removed.")
             if body.get("model") != connection.model:
                 return block(403, "MODEL_NOT_ALLOWED", f"This token may only use model '{connection.model}'.")
+            if connection.kek_id == keyvault.ACCOUNT_KEK_ID:
+                # A workspace key: only this pass carries what unlocks it.
+                pk = conn.execute(select(db.pass_keys).where(db.pass_keys.c.jti == jti)).first()
+                if pk is None or pk.conn_id != connection.id or not claims.get("k"):
+                    return block(
+                        403,
+                        "PASS_CANT_UNLOCK",
+                        "This pass can't unlock its key. It was probably made before a security upgrade: create a new pass.",
+                    )
+                pass_wrapped = pk.wrapped_dek
 
         # Real calls in the control room and in customer workspaces; public
         # sandboxes always use the fake AI, even with a saved key.
@@ -418,9 +449,22 @@ def _handle_proxy(presented: str, body, ip: str):
     try:
         if connection is not None:
             # Decrypt the team's key just in time, use it for this one call, drop it.
+            dek = None
+            if pass_wrapped is not None:
+                # Step one: the pass's unlock code opens its copy of the data key. If
+                # that fails, the pass is wrong (or forged), not the saved key.
+                try:
+                    secret = base64.urlsafe_b64decode(str(claims["k"]) + "=" * (-len(str(claims["k"])) % 4))
+                    dek = keyvault.unwrap_dek(pass_wrapped, keyvault.pass_key(secret), keyvault.pass_aad(space, connection.id, jti))
+                except (keyvault.KeyIntegrityError, ValueError, TypeError):
+                    refund_and_log("CALL_BLOCKED", {"code": "PASS_CANT_UNLOCK", "reason": "The pass's unlock code didn't open the saved key."})
+                    return _blocked(403, "PASS_CANT_UNLOCK", "This pass can't unlock its key. Create a new pass.")
             try:
-                api_key = keyvault.unseal(connection.ciphertext, connection.wrapped_dek, space, connection.id)
-            except keyvault.KeyIntegrityError:
+                if dek is not None:
+                    api_key = keyvault.open_with_dek(connection.ciphertext, dek, space, connection.id)
+                else:
+                    api_key = keyvault.unseal(connection.ciphertext, connection.wrapped_dek, space, connection.id)
+            except (keyvault.KeyIntegrityError, ValueError, TypeError):
                 refund_and_log("KEY_INTEGRITY_FAILED", {"connection": connection.name, "connection_id": connection.id})
                 return _blocked(
                     409,
@@ -433,7 +477,7 @@ def _handle_proxy(presented: str, body, ip: str):
                 else:
                     result = upstream.fake_completion(body)
             finally:
-                del api_key
+                del api_key, dek
         elif upstream_name == "openai":
             result = upstream.openai_completion(body)
         else:
@@ -560,7 +604,7 @@ def op_config(space: str) -> dict:
     }
 
 
-def op_issue(space: str, req: IssueRequest) -> dict:
+def op_issue(space: str, req: IssueRequest, user_key: bytes | None = None) -> dict:
     if req.upstream == "openai" and (not config.OPENAI_ENABLED or not (space == db.MAIN or is_sandbox(space))):
         raise HTTPException(400, "The server's own key isn't available here. Use one of your saved keys or the free practice AI.")
     tier = _tier(space)
@@ -591,7 +635,24 @@ def op_issue(space: str, req: IssueRequest) -> dict:
                 raise HTTPException(404, "No stored provider key with that id.")
             if _is_tampered(conn, space, stored.id):
                 raise HTTPException(409, "This saved key was tampered with. Remove it and add the key again.")
-        token, claims = tokens.mint(space, req.agent, req.upstream, ttl, max_calls, budget)
+        jti, unlock, pass_wrapped = secrets.token_hex(8), None, None
+        if req.upstream.startswith("c_") and stored.kek_id == keyvault.ACCOUNT_KEK_ID:
+            # Unlock the key with the team's password-derived key (only possible while
+            # they're signed in), then give this pass its own copy of the data key,
+            # locked with a secret that only the pass carries.
+            if user_key is None:
+                raise HTTPException(401, "Your session has ended. Please log in again to unlock your keys.")
+            try:
+                dek = keyvault.connection_dek(stored.wrapped_dek, space, stored.id, keyvault.account_key(user_key))
+            except keyvault.KeyIntegrityError:
+                raise HTTPException(409, "Leash couldn't unlock this saved key. Remove it and add the key again.")
+            secret = secrets.token_bytes(16)
+            unlock = base64.urlsafe_b64encode(secret).rstrip(b"=").decode()
+            pass_wrapped = keyvault.wrap_for_pass(dek, secret, space, stored.id, jti)
+            del dek, secret
+        token, claims = tokens.mint(space, req.agent, req.upstream, ttl, max_calls, budget, jti=jti, unlock=unlock)
+        if pass_wrapped is not None:
+            conn.execute(db.pass_keys.insert().values(jti=jti, space=space, conn_id=req.upstream, wrapped_dek=pass_wrapped))
         conn.execute(
             db.tokens.insert().values(
                 jti=claims["jti"],
@@ -611,11 +672,18 @@ def op_issue(space: str, req: IssueRequest) -> dict:
             conn,
             space,
             "TOKEN_ISSUED",
-            {"agent": req.agent, "upstream": req.upstream, "ttl_minutes": ttl, "max_calls": max_calls, "budget_usd": budget},
+            {
+                "agent": req.agent, "upstream": req.upstream, "ttl_minutes": ttl, "max_calls": max_calls, "budget_usd": budget,
+                **({"key_unlock": "carried by this pass only"} if unlock else {}),
+            },
             jti=claims["jti"],
         )
     # The token itself is returned once and never stored. Only its id is kept.
-    return {"token": token, "claims": claims}
+    # The unlock code stays inside the pass; it isn't repeated in the readable claims.
+    shown = {name: value for name, value in claims.items() if name != "k"}
+    if unlock:
+        shown["key_unlock"] = "inside this pass"
+    return {"token": token, "claims": shown}
 
 
 def op_list_tokens(space: str) -> list:
@@ -666,6 +734,7 @@ def op_revoke(space: str, jti: str, reason: str) -> dict:
             raise HTTPException(404, "No token with that id.")
         if not row.revoked:
             conn.execute(db.tokens.update().where(t.jti == jti).values(revoked=True, revoked_reason=reason))
+            conn.execute(db.pass_keys.delete().where(db.pass_keys.c.jti == jti))  # it can never unlock the key again
             audit.append(conn, space, "TOKEN_REVOKED", {"agent": row.agent, "reason": reason}, jti=jti)
     return {"ok": True}
 
@@ -843,6 +912,7 @@ def op_seal_test(space: str, jti: str) -> dict:
 def _wipe_space(conn, space: str) -> None:
     conn.execute(db.audit.delete().where(db.audit.c.space == space))
     conn.execute(db.tokens.delete().where(db.tokens.c.space == space))
+    conn.execute(db.pass_keys.delete().where(db.pass_keys.c.space == space))
     conn.execute(db.alerts.delete().where(db.alerts.c.space == space))
     conn.execute(db.settings.delete().where(db.settings.c.key == f"{space}:kill_all"))
 
@@ -905,11 +975,16 @@ def _connection_view(row, tampered: bool = False) -> dict:
         "status": "removed" if row.revoked else ("tampered" if tampered else "active"),
         "created_ms": row.created_ms,
         "stored": {
-            "algorithm": keyvault.ALGORITHM,
+            "algorithm": keyvault.ACCOUNT_ALGORITHM if row.kek_id == keyvault.ACCOUNT_KEK_ID else keyvault.ALGORITHM,
             "ciphertext": "(erased)" if erased else row.ciphertext[:40] + "…",
             "wrapped_data_key": "(erased)" if erased else row.wrapped_dek[:40] + "…",
             "master_key_id": row.kek_id,
-            "master_key_location": "Environment variable on the server, never in the database",
+            "master_key_location": (
+                "Locked with your password-derived key plus Leash's master key. Neither one alone can open it, "
+                "and each agent pass carries its own unlock code that Leash never stores."
+                if row.kek_id == keyvault.ACCOUNT_KEK_ID
+                else "Environment variable on the server, never in the database"
+            ),
         },
     }
 
@@ -923,7 +998,7 @@ def op_list_connections(space: str) -> list:
         return [_connection_view(r, _is_tampered(conn, space, r.id)) for r in rows]
 
 
-def op_add_connection(space: str, req: ConnectionRequest) -> dict:
+def op_add_connection(space: str, req: ConnectionRequest, user_key: bytes | None = None) -> dict:
     api_key = req.api_key.strip()
     if any(ch.isspace() for ch in api_key):
         raise HTTPException(400, "The API key can't contain spaces.")
@@ -939,7 +1014,12 @@ def op_add_connection(space: str, req: ConnectionRequest) -> dict:
             if hmac.compare_digest(existing.key_fingerprint, fingerprint):
                 raise HTTPException(409, f"This key is already stored as '{existing.name}'.")
         conn_id = "c_" + secrets.token_hex(6)
-        sealed = keyvault.seal(api_key, space, conn_id)
+        if is_workspace(space):
+            if user_key is None:
+                raise HTTPException(401, "Your session has ended. Please log in again to unlock your keys.")
+            sealed = keyvault.seal(api_key, space, conn_id, keyvault.account_key(user_key))
+        else:
+            sealed = keyvault.seal(api_key, space, conn_id)
         conn.execute(
             db.connections.insert().values(
                 id=conn_id,
@@ -984,21 +1064,25 @@ def op_remove_connection(space: str, conn_id: str) -> dict:
             raise HTTPException(404, "No stored provider key with that id.")
         if not row.revoked:
             conn.execute(db.connections.update().where(c.id == conn_id).values(revoked=True, ciphertext="", wrapped_dek=""))
+            conn.execute(db.pass_keys.delete().where(db.pass_keys.c.conn_id == conn_id))
             conn.execute(db.settings.delete().where(db.settings.c.key == f"{space}:{_tamper_flag(conn_id)}"))
             audit.append(conn, space, "KEY_REMOVED", {"name": row.name, "key_hint": row.key_hint, "note": "Ciphertext and data key erased."})
     return {"ok": True, "name": row.name}
 
 
-def op_test_connection(space: str, conn_id: str) -> dict:
+def op_test_connection(space: str, conn_id: str, user_key: bytes | None = None) -> dict:
     """Issue a tiny token for the stored key and send one call through the full proxy."""
     c = db.connections.c
     with db.engine.connect() as conn:
         row = conn.execute(select(db.connections).where(c.id == conn_id, c.space == space)).first()
     if row is None or row.revoked:
         raise HTTPException(404, "No stored provider key with that id.")
-    issued = op_issue(space, IssueRequest(agent="key-test", upstream=conn_id, ttl_minutes=5, max_calls=3, budget_usd=0.05))
+    issued = op_issue(space, IssueRequest(agent="key-test", upstream=conn_id, ttl_minutes=5, max_calls=3, budget_usd=0.05), user_key)
     body = {"model": row.model, "messages": [{"role": "user", "content": "In one short sentence: why should AI agents use short-lived, limited credentials?"}]}
     response = _handle_proxy(issued["token"], body, "internal")
+    with db.write_lock, db.engine.begin() as conn:
+        # The test pass is thrown away, so its copy of the key's lock goes too.
+        conn.execute(db.pass_keys.delete().where(db.pass_keys.c.jti == issued["claims"]["jti"]))
     data = json.loads(response.body)
     if response.status_code == 200:
         reply = (data.get("choices") or [{}])[0].get("message", {}).get("content") or "(empty reply)"
@@ -1030,8 +1114,8 @@ def mount_space_routes(router: APIRouter, get_space, demo: bool = True, webhooks
         return op_config(space)
 
     @router.post("/tokens")
-    def _issue(req: IssueRequest, space: str = Depends(get_space)):
-        return op_issue(space, req)
+    def _issue(req: IssueRequest, request: Request, space: str = Depends(get_space)):
+        return op_issue(space, req, getattr(request.state, "user_key", None))
 
     @router.get("/tokens")
     def _tokens(space: str = Depends(get_space)):
@@ -1078,16 +1162,16 @@ def mount_space_routes(router: APIRouter, get_space, demo: bool = True, webhooks
         return op_list_connections(space)
 
     @router.post("/connections")
-    def _add_connection(req: ConnectionRequest, space: str = Depends(get_space)):
-        return op_add_connection(space, req)
+    def _add_connection(req: ConnectionRequest, request: Request, space: str = Depends(get_space)):
+        return op_add_connection(space, req, getattr(request.state, "user_key", None))
 
     @router.post("/connections/{conn_id}/remove")
     def _remove_connection(conn_id: str, space: str = Depends(get_space)):
         return op_remove_connection(space, conn_id)
 
     @router.post("/connections/{conn_id}/test")
-    def _test_connection(conn_id: str, space: str = Depends(get_space)):
-        return op_test_connection(space, conn_id)
+    def _test_connection(conn_id: str, request: Request, space: str = Depends(get_space)):
+        return op_test_connection(space, conn_id, getattr(request.state, "user_key", None))
 
     if webhooks:
 
@@ -1194,6 +1278,9 @@ def _cleanup_sandboxes(conn) -> None:
     if time.time() - _last_cleanup < 60:
         return
     _last_cleanup = time.time()
+    # Expired passes can never be used again, so drop their copies of key locks.
+    expired = select(db.tokens.c.jti).where(db.tokens.c.exp < time.time())
+    conn.execute(db.pass_keys.delete().where(db.pass_keys.c.jti.in_(expired)))
     cutoff = _now_ms() - config.SANDBOX_TTL_HOURS * 3600 * 1000
     # Only public sandboxes expire. Customer workspaces ("acct_") are never touched.
     old = conn.execute(
@@ -1275,11 +1362,11 @@ def _account_checks(request: Request) -> None:
         raise HTTPException(403, "Missing app header.")
 
 
-def _set_session(request: Request, response: Response, account_id: str) -> None:
+def _set_session(request: Request, response: Response, account_id: str, user_key: bytes) -> None:
     secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
     response.set_cookie(
         accounts.COOKIE,
-        accounts.make_session(account_id),
+        accounts.make_session(account_id, user_key),
         max_age=accounts.SESSION_DAYS * 86400,
         httponly=True,
         samesite="lax",
@@ -1337,7 +1424,7 @@ def account_signup(req: SignupRequest, request: Request, response: Response):
         )
         ensure_space(conn, space)
         audit.append(conn, space, "ACCOUNT_CREATED", {"team": team})
-    _set_session(request, response, account_id)
+    _set_session(request, response, account_id, accounts.user_key(req.password, account_id))
     return {"ok": True}
 
 
@@ -1358,8 +1445,32 @@ def account_login(req: LoginRequest, request: Request, response: Response):
         raise HTTPException(401, "Wrong email or password.")
     if not accounts.verify_password(req.password, row.password_hash):
         raise HTTPException(401, "Wrong email or password.")
-    _set_session(request, response, row.id)
+    user_key = accounts.user_key(req.password, row.id)
+    _upgrade_keys(row.space, user_key)
+    _set_session(request, response, row.id, user_key)
     return {"ok": True}
+
+
+def _upgrade_keys(space: str, user_key: bytes) -> None:
+    """Keys saved before they were tied to passwords: re-lock them with the account key
+    the first time the team logs in (only possible now, with the password in hand)."""
+    c = db.connections.c
+    with db.write_lock, db.engine.begin() as conn:
+        rows = conn.execute(
+            select(db.connections).where(c.space == space, c.revoked.is_(False), c.kek_id != keyvault.ACCOUNT_KEK_ID)
+        ).all()
+        upgraded = 0
+        for row in rows:
+            try:
+                wrapped = keyvault.rewrap_for_account(row.wrapped_dek, space, row.id, user_key)
+            except keyvault.KeyIntegrityError:
+                continue  # a tampered key stays as it is; Leash already refuses to use it
+            conn.execute(
+                db.connections.update().where(c.id == row.id).values(wrapped_dek=wrapped, kek_id=keyvault.ACCOUNT_KEK_ID)
+            )
+            upgraded += 1
+        if upgraded:
+            audit.append(conn, space, "KEYS_UPGRADED", {"keys": upgraded, "note": "Saved keys are now locked with the team's password-derived key."})
 
 
 @account_router.post("/logout")

@@ -13,6 +13,9 @@ import os
 import re
 import time
 
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 from . import config
 
 COOKIE = "leash_session"
@@ -51,13 +54,28 @@ def _sign(body: str) -> str:
     return _b64e(hmac.new(config.SESSION_KEY, body.encode(), hashlib.sha256).digest())
 
 
-def make_session(account_id: str) -> str:
-    body = _b64e(json.dumps({"a": account_id, "exp": int(time.time()) + SESSION_DAYS * 86400}, separators=(",", ":")).encode())
+def user_key(password: str, account_id: str) -> bytes:
+    """A key derived from the team's password (scrypt). Never stored: it lives only
+    in the signed-in session and unlocks the team's saved API keys."""
+    salt = hmac.new(config.ACCOUNT_SALT_KEY, account_id.encode(), hashlib.sha256).digest()
+    return hashlib.scrypt(password.encode(), salt=salt, n=_N, r=_R, p=_P, dklen=32)
+
+
+def make_session(account_id: str, key: bytes) -> str:
+    """A signed session that also carries the account key, encrypted, so the
+    server can unlock the team's keys only while the team is signed in."""
+    nonce = os.urandom(12)
+    sealed = AESGCM(config.SESSION_ENC_KEY).encrypt(nonce, key, account_id.encode())
+    claims = {"a": account_id, "exp": int(time.time()) + SESSION_DAYS * 86400, "k": _b64e(nonce + sealed)}
+    body = _b64e(json.dumps(claims, separators=(",", ":")).encode())
     return f"{body}.{_sign(body)}"
 
 
 def read_session(value: str):
-    """Return the account id from a valid, unexpired session cookie, else None."""
+    """Return (account id, account key) from a valid, unexpired session cookie, else None.
+
+    Sessions from before keys were tied to passwords carry no key and count as
+    signed out, so those teams simply log in again."""
     if not value or value.count(".") != 1:
         return None
     body, sig = value.split(".")
@@ -67,9 +85,14 @@ def read_session(value: str):
         data = json.loads(_b64d(body))
     except (ValueError, json.JSONDecodeError):
         return None
-    if not isinstance(data, dict) or time.time() >= data.get("exp", 0):
+    if not isinstance(data, dict) or time.time() >= data.get("exp", 0) or not data.get("a") or not data.get("k"):
         return None
-    return data.get("a")
+    try:
+        blob = _b64d(data["k"])
+        key = AESGCM(config.SESSION_ENC_KEY).decrypt(blob[:12], blob[12:], str(data["a"]).encode())
+    except (InvalidTag, ValueError):
+        return None
+    return data["a"], key
 
 
 def normalise_email(email: str) -> str:

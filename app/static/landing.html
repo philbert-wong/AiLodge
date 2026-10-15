@@ -170,14 +170,17 @@ client = OpenAI(
       <div class="band-inner split">
         <div>
           <h2 id="byok-title">Your key, encrypted</h2>
-          <p>Each key is locked with its own random key, which is locked again with a master key that lives on the server, never in the database. A stolen copy of the database holds nothing usable.</p>
+          <p>Each key is locked with its own random key. That key is locked again with two things together: a key made from your team's password, which Leash never stores, and a master key that's kept outside the database.</p>
+          <p>Each agent pass carries its own unlock code, and Leash never keeps the pass. So a stolen copy of the database can't open your key or make a single call, even with the master key.</p>
           <p>If anyone changes a stored key, even by one character, Leash refuses to use it and tells you. Remove a key and it's erased for good.</p>
+          <p class="fine">One honest limit: someone who took over the running server could see a key while it's in use. So make a key just for Leash and give it a spending limit at your provider.</p>
         </div>
         <ol class="vault" aria-label="How a stored key is protected">
           <li><span class="vault-label">Your API key</span><code>sk-…3456</code></li>
-          <li><span class="vault-label">Locked with its own random key</span><span class="vault-sub">AES-256, the standard banks use</span></li>
-          <li><span class="vault-label">That key is locked with a master key</span><span class="vault-sub">Kept on the server, never in the database</span></li>
-          <li class="vault-db"><span class="vault-label">The database stores</span><code>q3VzZXItZW5jcnlwdGVkLWJsb2I…</code><span class="vault-sub">Scrambled text and nothing else</span></li>
+          <li><span class="vault-label">Locked with its own random key</span><span class="vault-sub">AES-256-GCM, the standard banks use</span></li>
+          <li><span class="vault-label">That key needs your password and the master key</span><span class="vault-sub">Your password is never stored; the master key isn't in the database</span></li>
+          <li><span class="vault-label">Each pass gets its own unlock code</span><span class="vault-sub">Carried by the pass, never stored by Leash</span></li>
+          <li class="vault-db"><span class="vault-label">The database stores</span><code>q3VzZXItZW5jcnlwdGVkLWJsb2I…</code><span class="vault-sub">Scrambled text that nothing in it can open</span></li>
         </ol>
       </div>
     </section>

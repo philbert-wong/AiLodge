@@ -39,10 +39,13 @@ def _sign(body: str) -> str:
     return _b64e(hmac.new(config.TOKEN_KEY, body.encode(), hashlib.sha256).digest())
 
 
-def mint(space: str, agent: str, upstream: str, ttl_minutes: int, max_calls: int, budget_usd: float) -> tuple[str, dict]:
+def mint(space: str, agent: str, upstream: str, ttl_minutes: int, max_calls: int, budget_usd: float,
+         jti: str | None = None, unlock: str | None = None) -> tuple[str, dict]:
+    """`unlock` is a secret that only this pass carries: for a workspace's saved
+    key, it is what unlocks the key. Leash never stores the pass itself."""
     now = int(time.time())
     claims = {
-        "jti": secrets.token_hex(8),
+        "jti": jti or secrets.token_hex(8),
         "space": space,
         "agent": agent,
         "upstream": upstream,
@@ -51,6 +54,8 @@ def mint(space: str, agent: str, upstream: str, ttl_minutes: int, max_calls: int
         "max_calls": max_calls,
         "budget_usd": round(budget_usd, 4),
     }
+    if unlock:
+        claims["k"] = unlock
     body = _b64e(json.dumps(claims, separators=(",", ":"), sort_keys=True).encode())
     return f"{PREFIX}{body}.{_sign(body)}", claims
 
